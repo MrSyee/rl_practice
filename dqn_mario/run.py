@@ -24,10 +24,14 @@ parser.add_argument(
 parser.set_defaults(load_from=None)
 args = parser.parse_args()
 
+random_seed = 777
+
 EPISODE = 500
 TARGET_UPDATE = 100
 TRAIN_START = 0
-SAVE_PERIOD = 5
+EPOCH = 150
+SAVE_PERIOD = 10
+TEST_PERIOD = 1
 CHECKPOINT_NAME = "dqn"
 
 env = gym_super_mario_bros.make('SuperMarioBros-v2')
@@ -58,71 +62,79 @@ if args.load_from is not None:
 
 sess.run(tf.global_variables_initializer())
 
+"""Set random seed"""
+env.seed(random_seed)
+np.random.seed(random_seed)
+tf.set_random_seed(random_seed)
+
 
 def train():
+    total_step = 1
+    train_step = 1
+
     for n_episode in range(1, EPISODE + 1):
         state = env.reset()
-        total_step = 1
-        total_reward = 0
-        total_loss = []
+        episode_step = 1
+        episode_reward = 0
+        episode_loss = []
         done = False
 
         while not done:
             action = dqn.select_action(state)
             next_state, reward, done, _ = env.step(action)
             dqn.buffer.add(state, action, reward, next_state, done)
-            total_reward += reward
+            episode_reward += reward
 
             if args.render:
                 env.render()
 
-            # train model
-            if total_step > TRAIN_START and len(dqn.buffer) > dqn.batch_size:
-                loss = dqn.update_model()
-                total_loss.append(loss)
-
-                # update target network
-                if total_step % TARGET_UPDATE == 0:
-                    dqn.update_target_network()
-
             state = next_state
             total_step += 1
+            episode_step += 1
+
+        # train model
+        if total_step > TRAIN_START and len(dqn.buffer) > dqn.batch_size:
+            for _ in range(EPOCH):
+                loss = dqn.update_model()
+                episode_loss.append(loss)
+                train_step += 1
+
+                # update target network
+                if train_step % TARGET_UPDATE == 0:
+                    dqn.update_target_network()
 
         # save model
         if total_step > TRAIN_START and n_episode % SAVE_PERIOD == 0:
             dqn.save_model(CHECKPOINT_NAME + str(n_episode))
 
-        mean_loss = np.mean(total_loss)
-        print("[Episode {}] step {}, reward {}, loss {:.4f}, epsilon {:.4f}".format(
-            n_episode, total_step, total_reward, mean_loss, dqn.epsilon
+        mean_loss = np.mean(episode_loss)
+        print("[Episode {}] total_step {}, episode_step {}, reward {}\nloss {:.4f}, epsilon {:.4f}".format(
+            n_episode, total_step, episode_step, episode_reward, mean_loss, dqn.epsilon
         ))
 
     env.close()
 
 
-def test():
-    dqn.epsilon = 0
+def test(test_episode=5):
+    dqn.epsilon = 0.01
 
-    for n_episode in range(1, EPISODE + 1):
+    for n_episode in range(1, test_episode + 1):
         state = env.reset()
         total_step = 1
-        total_reward = 0
+        episode_reward = 0
         done = False
 
         while not done:
             action = dqn.select_action(state)
             next_state, reward, done, info = env.step(action)
-            print(info)
-            total_reward += reward
-
-            if args.render:
-                env.render()
+            episode_reward += reward
+            env.render()
 
             state = next_state
             total_step += 1
 
         print("[Episode {}] step {}, reward {}".format(
-            n_episode, total_step, total_reward
+            n_episode, total_step, episode_reward
         ))
 
     env.close()
