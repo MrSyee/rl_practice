@@ -36,7 +36,7 @@ class DQNAgent:
         self.update_target_network()
 
         # replay buffer
-        self.buffer = ReplayBuffer(100000)
+        self.buffer = ReplayBuffer(50000)
 
         # optimizer
         self.loss_op, self.train_op = self._build_op()
@@ -62,11 +62,11 @@ class DQNAgent:
             selected_action = np.random.randint(self.action_size)
         else:
             state = np.expand_dims(state, axis=0)
-            action = tf.argmax(self.policy_net.q_value, axis=1)
             selected_action = self.sess.run(
-                action,
+                self.policy_net.q_value,
                 feed_dict={self.policy_net.input_: state}
             )
+            selected_action = np.argmax(selected_action, axis=1)
             selected_action = selected_action[0]
 
         # 매 step마다 epsilon을 줄여나갑니다.
@@ -78,8 +78,8 @@ class DQNAgent:
         """학습 네트워크를 학습합니다."""
         states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
 
-        target_q = tf.reduce_max(self.target_net.q_value, 1)
-        target_q = target_q.eval({self.target_net.input_: next_states}, self.sess)
+        target_q = self.target_net.q_value.eval({self.target_net.input_: next_states}, self.sess)
+        target_q = np.max(target_q, axis=1)
         targets = rewards + self.discount_factor * target_q * (1. - dones)
 
         loss, _ = self.sess.run(

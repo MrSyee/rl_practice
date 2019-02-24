@@ -26,10 +26,10 @@ args = parser.parse_args()
 
 random_seed = 777
 
-EPISODE = 500
+EPISODE = 1000
 TARGET_UPDATE = 100
 TRAIN_START = 0
-EPOCH = 150
+EPOCH = 1000
 SAVE_PERIOD = 10
 TEST_PERIOD = 1
 CHECKPOINT_NAME = "dqn"
@@ -53,6 +53,11 @@ action_size = env.action_space.n
 print("state_size", state_size)
 print("action_size", action_size)
 
+"""Set random seed"""
+env.seed(random_seed)
+np.random.seed(random_seed)
+tf.set_random_seed(random_seed)
+
 # create dqn agent
 sess = tf.Session()
 dqn = DQNAgent(sess, state_size, action_size)
@@ -61,11 +66,6 @@ if args.load_from is not None:
     dqn.load_model(args.load_from)
 
 sess.run(tf.global_variables_initializer())
-
-"""Set random seed"""
-env.seed(random_seed)
-np.random.seed(random_seed)
-tf.set_random_seed(random_seed)
 
 
 def train():
