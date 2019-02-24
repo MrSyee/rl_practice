@@ -20,7 +20,7 @@ class DQNAgent:
         self.learning_rate = 0.00025
 
         # epsilon
-        self.s_epsilon = 1
+        self.s_epsilon = 0
         self.e_epsilon = 0.01
         self.n_epsilon_decay = 10000
         self.epsilon = self.s_epsilon
@@ -67,10 +67,11 @@ class DQNAgent:
                 action,
                 feed_dict={self.policy_net.input_: state}
             )
+            selected_action = selected_action[0]
+
         # 매 step마다 epsilon을 줄여나갑니다.
         if self.epsilon >= self.e_epsilon:
             self.epsilon -= (self.s_epsilon - self.e_epsilon) / self.n_epsilon_decay
-
         return selected_action
 
     def update_model(self):
@@ -86,6 +87,8 @@ class DQNAgent:
             feed_dict={self.policy_net.input_: states,
                        self.actions: actions,
                        self.targets: targets})
+
+        return loss
 
     def update_target_network(self):
         """학습 네트웍의 변수의 값들을 타겟 네트웍으로 복사해서 타겟 네트웍의 값들을 최신으로 업데이트합니다."""

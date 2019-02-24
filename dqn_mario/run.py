@@ -24,7 +24,7 @@ TARGET_UPDATE = 100
 
 env = gym_super_mario_bros.make('SuperMarioBros-v2')
 env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-# env = wrap_mario(env)
+env = wrap_mario(env)
 """
 SIMPLE_MOVEMENT = [
     ['NOOP'],
@@ -46,21 +46,25 @@ sess = tf.Session()
 dqn = DQNAgent(sess, state_size, action_size)
 sess.run(tf.global_variables_initializer())
 
-total_step = 1
-total_reward = []
-total_loss = []
-
 
 def train():
-    for n_episode in range(EPISODE):
+    for n_episode in range(1, EPISODE + 1):
         state = env.reset()
+        total_step = 1
+        total_reward = []
+        total_loss = []
         done = False
 
         while not done:
-            # action = dqn.select_action(state)
-            next_state, reward, done, _ = env.step(env.action_space.sample())
+            action = dqn.select_action(state)
+            next_state, reward, done, _ = env.step(action)
             if args.render:
                 env.render()
+
+            if total_step % train_period == 0:
+                loss = dqn.update_model()
+                total_loss.append(loss)
+            total_reward.append(reward)
 
     env.close()
 
