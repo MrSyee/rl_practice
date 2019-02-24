@@ -3,22 +3,25 @@ from collections import deque
 import gym
 import cv2
 
+IMG_SIZE = 84
+
 
 def _process_frame_mario(frame):
     if frame is not None:  # for future meta implementation
         img = np.reshape(frame, [240, 256, 3]).astype(np.float32)
         img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
-        x_t = np.expand_dims(cv2.resize(img, (84, 84)), axis=-1)
+        x_t = np.expand_dims(cv2.resize(img, (IMG_SIZE, IMG_SIZE)), axis=-1)
         x_t.astype(np.uint8)
     else:
-        x_t = np.zeros((84, 84, 1))
+        x_t = np.zeros((IMG_SIZE, IMG_SIZE, 1))
+
     return x_t
 
 
 class ProcessFrameMario(gym.Wrapper):
     def __init__(self, env=None):
         super(ProcessFrameMario, self).__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(1, 84, 84))
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(1, IMG_SIZE, IMG_SIZE))
         self.prev_time = 400
         self.prev_stat = 0
         self.prev_score = 0
@@ -45,10 +48,10 @@ class ProcessFrameMario(gym.Wrapper):
 
 
 class BufferSkipFrames(gym.Wrapper):
-    def __init__(self, env=None, skip=4, shape=(84, 84)):
+    def __init__(self, env=None, skip=4, shape=(IMG_SIZE, IMG_SIZE)):
         super(BufferSkipFrames, self).__init__(env)
         self.counter = 0
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 4))
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(IMG_SIZE, IMG_SIZE, 4))
         self.skip = skip
         self.buffer = deque(maxlen=self.skip)
 
@@ -68,7 +71,7 @@ class BufferSkipFrames(gym.Wrapper):
                 self.buffer.append(obs)
 
         frame = np.stack(self.buffer, axis=0)
-        frame = np.reshape(frame, (84, 84, 4))
+        frame = np.reshape(frame, (IMG_SIZE, IMG_SIZE, 4))
         return frame, total_reward, done, info
 
     def _reset(self):
@@ -78,7 +81,7 @@ class BufferSkipFrames(gym.Wrapper):
             self.buffer.append(obs)
 
         frame = np.stack(self.buffer, axis=0)
-        frame = np.reshape(frame, (84, 84, 4))
+        frame = np.reshape(frame, (IMG_SIZE, IMG_SIZE, 4))
         return frame
 
     def change_level(self, level):
@@ -113,9 +116,48 @@ class NormalizedEnv(gym.ObservationWrapper):
         self.env.change_level(level)
 
 
+class EpisodicLifeEnv(gym.Wrapper):
+    def __init__(self, env):
+        """Make end-of-life == end-of-episode, but only reset on true game over.
+        Done by DeepMind for the DQN and co. since it helps value estimation.
+        """
+        gym.Wrapper.__init__(self, env)
+        self.lives = 0
+        self.done = True
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.done = done
+        # check current lives, make loss of life terminal,
+        # then update lives to handle bonus lives
+        lives = info['life']
+        if lives < self.lives and lives > 0:
+            # for Qbert sometimes we stay in lives == 0 condtion for a few frames
+            # so its important to keep lives > 0, so that we only reset once
+            # the environment advertises done.
+            self.done = True
+        self.lives = lives
+        return obs, reward, self.done, info
+
+    def reset(self, **kwargs):
+        """Reset only when lives are exhausted.
+        This way all states are still reachable even though lives are episodic,
+        and the learner need not know about any of this behind-the-scenes.
+        """
+        if self.done:
+            obs = self.env.reset(**kwargs)
+        else:
+            # no-op step to advance from terminal/lost life state
+            obs, _, _, _ = self.env.step(0)
+        self.lives = self.env.unwrapped._life
+        return obs
+
+
 def wrap_mario(env):
     # assert 'SuperMarioBros' in env.spec.id
     env = ProcessFrameMario(env)
     env = NormalizedEnv(env)
     env = BufferSkipFrames(env)
+    env = EpisodicLifeEnv(env)
+
     return env

@@ -20,7 +20,7 @@ class DQNAgent:
         self.learning_rate = 0.00025
 
         # epsilon
-        self.s_epsilon = 0
+        self.s_epsilon = 1.0
         self.e_epsilon = 0.01
         self.n_epsilon_decay = 10000
         self.epsilon = self.s_epsilon
@@ -100,3 +100,18 @@ class DQNAgent:
         for main_q_var, target_var in zip(main_q_vars, target_vars):
             copy_op.append(target_var.assign(main_q_var.value()))
         self.sess.run(copy_op)
+
+    def save_model(self, filename):
+        """Save model."""
+        saver = tf.train.Saver()
+        path = "./save/" + filename + ".ckpt"
+        save_path = saver.save(self.sess, path)
+        print("[Model saved in path: %s !!!]" % save_path)
+
+    def load_model(self, filename):
+        """Load model."""
+        saver = tf.train.Saver()
+        path = "./save/" + filename + ".ckpt"
+        saver.restore(self.sess, path)
+        print("[Model restored !!!]")
+
