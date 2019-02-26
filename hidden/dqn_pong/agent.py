@@ -22,7 +22,7 @@ class DQNAgent:
         # epsilon
         self.s_epsilon = 1.0
         self.e_epsilon = 0.01
-        self.n_epsilon_decay = 100000
+        self.n_epsilon_decay = 200000
         self.epsilon = self.s_epsilon
 
         # place holder
