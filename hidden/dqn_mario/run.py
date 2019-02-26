@@ -62,10 +62,10 @@ tf.set_random_seed(random_seed)
 sess = tf.Session()
 dqn = DQNAgent(sess, state_size, action_size)
 
+sess.run(tf.global_variables_initializer())
+
 if args.load_from is not None:
     dqn.load_model(args.load_from)
-
-sess.run(tf.global_variables_initializer())
 
 
 def train():
