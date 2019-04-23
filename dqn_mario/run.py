@@ -16,6 +16,9 @@ parser.add_argument(
     "--test", action="store_true", help="test mode (no training)"
 )
 parser.add_argument(
+    "--render", action="store_true", help="test mode (no training)"
+)
+parser.add_argument(
     "--load-from", type=str, help="test mode (no training)"
 )
 parser.set_defaults(load_from=None)
@@ -77,9 +80,32 @@ def train():
         done = False
 
         while not done:
-            """
-            train code 구현
-            """
+            action = dqn.select_action(state)
+            next_state, reward, done, _ = env.step(action)
+            dqn.buffer.add(state, action, reward, next_state, done)
+            episode_reward += reward
+
+            if args.render:
+                env.render()
+
+            state = next_state
+            total_step += 1
+            episode_step += 1
+
+        # train model
+        if total_step > TRAIN_START and len(dqn.buffer) > dqn.batch_size:
+            for _ in range(EPOCH):
+                loss = dqn.update_model()
+                episode_loss.append(loss)
+                train_step += 1
+
+                # update target network
+                if train_step % TARGET_UPDATE == 0:
+                    dqn.update_target_network()
+
+        # save model
+        if total_step > TRAIN_START and n_episode % SAVE_PERIOD == 0:
+            dqn.save_model(CHECKPOINT_NAME + str(n_episode))
 
         mean_loss = np.mean(episode_loss)
         print("[Episode {}] total_step {}, episode_step {}, reward {}\nloss {:.4f}, epsilon {:.4f}".format(
@@ -92,13 +118,24 @@ def train():
 def test(test_episode=5):
     dqn.epsilon = 0.01
 
-    """
-    test code 구현
-    """
+    for n_episode in range(1, test_episode + 1):
+        state = env.reset()
+        total_step = 1
+        episode_reward = 0
+        done = False
 
-    print("[Episode {}] step {}, reward {}".format(
-        n_episode, total_step, episode_reward
-    ))
+        while not done:
+            action = dqn.select_action(state)
+            next_state, reward, done, info = env.step(action)
+            episode_reward += reward
+            env.render()
+
+            state = next_state
+            total_step += 1
+
+        print("[Episode {}] step {}, reward {}".format(
+            n_episode, total_step, episode_reward
+        ))
 
     env.close()
 

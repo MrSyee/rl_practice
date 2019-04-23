@@ -33,8 +33,8 @@ class DQNAgent:
         self.targets = tf.placeholder(tf.float32, shape=None)
 
         # network
-        self.policy_net = DQN({})
-        self.target_net = DQN({})
+        self.policy_net = DQN(self.state_size, self.action_size, net_name="policy_net")
+        self.target_net = DQN(self.state_size, self.action_size, net_name="target_net")
         self.sess.run(tf.global_variables_initializer())
         self.update_target_network()
 
